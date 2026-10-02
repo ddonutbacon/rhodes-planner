@@ -130,5 +130,9 @@ pytest -q
 
 This project demonstrates Python application development, API integration,
 external-schema normalization, domain modeling, deterministic progression
+
+## AI-Assisted Development
+Rhodes Planner was developed using an AI-assisted development workflow. AI tools were used to help generate and refactor code, investigate bugs, design tests, and iterate on implementation.  
+Project scope, feature requirements, UX decisions, testing scenarios, validation against real account data, and release decisions were directed and reviewed by the project author. Generated code was iteratively tested and corrected throughout development.
 logic, local persistence, data-security design, caching, testing, and
 optimization-oriented product design.
