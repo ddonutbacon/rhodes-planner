@@ -14,7 +14,7 @@ want to build next, what can be crafted, and what still needs to be farmed.
 
 ## Highlights
 
-- ARKprts full-account JSON import
+- ArkPRTS full-account JSON import
 - Persistent local profile with a dedicated **Nuke / Clear Profile** control
 - Searchable operator tables with class, rarity and ownership filters
 - Current operator state treated as a hard minimum
@@ -104,7 +104,7 @@ sources used by your deployment.
 
 Rhodes Planner is designed as a local-first personal toolkit.
 
-- Raw ARKprts exports are parsed in memory and not persisted by Rhodes Planner.
+- Raw ArkPRTS exports are parsed in memory and not persisted by Rhodes Planner.
 - The saved local profile contains normalized roster, depot and plan data only.
 - The local profile is not encrypted at rest.
 - No account password or email verification code is requested.
