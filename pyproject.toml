@@ -1,0 +1,9 @@
+[project]
+name = "rhodes-planner"
+version = "0.6.0"
+description = "Account-aware Arknights progression and farming planner"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
