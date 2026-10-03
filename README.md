@@ -15,6 +15,8 @@ Arknights progression planning is usually split across several tools. Rhodes
 Planner focuses on the account-aware workflow: what you already own, what you
 want to build next, what can be crafted, and what still needs to be farmed.
 
+I've been enjoying the game since it's release date. This toolkit is the culmination of my love-hate relationship with the game. 
+
 ## Highlights
 
 - ArkPRTS full-account JSON import
