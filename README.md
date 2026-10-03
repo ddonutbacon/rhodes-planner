@@ -6,6 +6,9 @@ current account into an actionable upgrade plan.
 > Import account state → choose operator targets → preserve any stash you want
 > to keep → craft efficiently → farm the remaining T3 materials, LMD and EXP.
 
+Rhodes Planner dynamically consumes current community game data and drop statistics, allowing new operators, materials, modules, and stages to be recognised automatically when upstream schemas remain compatible. 
+Changes to upstream schemas or new progression mechanics may require a Rhodes Planner update.
+
 ## Why this exists
 
 Arknights progression planning is usually split across several tools. Rhodes
