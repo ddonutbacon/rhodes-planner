@@ -142,7 +142,6 @@ A sincere thank you to:
 - [**Arknight-Images by Aceship**](https://github.com/Aceship/Arknight-Images) and other community-maintained Arknights image repositories used for operator and material artwork in the interface.
 - The broader **Arknights community**, whose guides, tools, experimentation, documentation, and shared knowledge continue to make projects like this possible.
 - The maintainers and contributors behind [**Python**](https://www.python.org/), [**Streamlit**](https://streamlit.io/), and the many open-source libraries used throughout the project.
-- **OpenAI's ChatGPT** for serving as the primary AI-assisted development partner during prototyping, implementation, debugging, refactoring, test generation, and iteration.
 This project is an **unofficial, non-commercial fan project**.
 
 All Arknights-related names, characters, artwork, game data, and other intellectual property belong to their respective rights holders.
