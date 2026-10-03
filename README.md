@@ -129,6 +129,26 @@ pytest -q
 - Event-shop economics and sanity-potion calendars are not modeled yet.
 - Upstream community schemas can change and adapters may need maintenance.
 
+## Acknowledgements
+
+Rhodes Planner would not exist without the work of the Arknights community and the open-source projects that make tools like this possible.
+
+A sincere thank you to:
+
+- **Hypergryph and Yostar** for creating and publishing *Arknights*, the game that inspired this project in the first place.
+- [**ArknightsAssets / ArknightsGamedata**](https://github.com/ArknightsAssets/ArknightsGamedata) for maintaining accessible structured game data used to keep operator, material, module, stage, and progression information current.
+- [**Penguin Statistics**](https://penguin-stats.io/) and [**ArkPlanner**](https://github.com/penguin-statistics/ArkPlanner) for their extensive community-maintained drop data, farming statistics, planning concepts, and interoperability ecosystem.
+- [**ArkPRTS**](https://github.com/thesadru/ArkPRTS) and [**arkprtserver**](https://github.com/ashleney/arkprtserver) for making detailed account-data export workflows possible, which became the foundation of Rhodes Planner's account-aware planning features.
+- [**Arknight-Images by Aceship**](https://github.com/Aceship/Arknight-Images) and other community-maintained Arknights image repositories used for operator and material artwork in the interface.
+- The broader **Arknights community**, whose guides, tools, experimentation, documentation, and shared knowledge continue to make projects like this possible.
+- The maintainers and contributors behind [**Python**](https://www.python.org/), [**Streamlit**](https://streamlit.io/), and the many open-source libraries used throughout the project.
+- **OpenAI's ChatGPT** for serving as the primary AI-assisted development partner during prototyping, implementation, debugging, refactoring, test generation, and iteration.
+This project is an **unofficial, non-commercial fan project**.
+
+All Arknights-related names, characters, artwork, game data, and other intellectual property belong to their respective rights holders.
+
+To everyone whose work, data, documentation, tooling, and community knowledge helped make Rhodes Planner possible: **thank you.**
+
 ## Portfolio summary
 
 This project demonstrates Python application development, API integration,
