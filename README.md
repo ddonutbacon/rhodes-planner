@@ -18,7 +18,6 @@ want to build next, what can be crafted, and what still needs to be farmed.
 I've been enjoying the game since it's release date. This toolkit is the culmination of my love-hate relationship with the game. 
 
 ## Highlights
-
 - ArkPRTS full-account JSON import
 - Persistent local profile with a dedicated **Nuke / Clear Profile** control
 - Searchable operator tables with class, rarity and ownership filters
