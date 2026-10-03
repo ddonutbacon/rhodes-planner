@@ -146,8 +146,7 @@ A sincere thank you to:
 This project is an **unofficial, non-commercial fan project**.
 
 All Arknights-related names, characters, artwork, game data, and other intellectual property belong to their respective rights holders.
-
-To everyone whose work, data, documentation, tooling, and community knowledge helped make Rhodes Planner possible: **thank you.**
+To everyone whose work, data, documentation, tooling, and community knowledge helped make Rhodes Planner possible, **thank you.**
 
 ## Portfolio summary
 
