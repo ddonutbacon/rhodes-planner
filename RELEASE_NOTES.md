@@ -1,50 +1,19 @@
+# Rhodes Planner v0.7.3
 
-# Rhodes Planner v0.6.0 — Publish Candidate
+## Portable-path and launcher resilience
 
-- Fixed Penguin Statistics export so it now exports Rhodes' **effective farming
-  deficit**, not the original upgrade requirement.
-- For every effective farm target, Penguin receives `need = have + amount_to_farm`.
-  This preserves Reserve semantics and prevents Penguin from subtracting the
-  user's depot a second time.
-- Reserved T4/T5 chains now export their lower-tier farming targets to Penguin,
-  matching the Rhodes Stage tab.
-- Penguin export now respects passive base LMD/EXP credit as well.
-- Added stronger account-data minimization: normalized local inventory keeps
-  progression materials + EXP cards only.
-- Added `THIRD_PARTY_NOTICES.md`, corrected Penguin Statistics data-license
-  attribution, and clarified that the project is non-commercial where Penguin
-  data is used.
-- Added weekly `pip-audit` + `bandit` GitHub Actions and Dependabot configuration.
+- The portable app no longer depends on the root folder being named `portable`.
+- The entire Rhodes Planner folder can be renamed or moved to another writable location or drive without changing internal paths.
+- The Windows launcher resolves the bundled Python runtime and application from its own location, not from the caller's current working directory.
+- Startup now uses a Python launcher that selects port 8501 when available and automatically falls back to the next free local port through 8599.
+- Browser launch follows the actual selected local port.
+- Missing runtime/application files now produce explicit path diagnostics.
+- The portable build filename is generated from `rhodes.__version__`, preventing stale release names.
+- Project/package metadata and the HTTP User-Agent now report the same application version.
+- HTTP cache writes are atomic. A malformed or partially written cache file is discarded and refreshed instead of preventing startup.
+- Cache failures are treated as non-fatal because the cache is an optimization, not user data.
 
-## Validation target
+## Previous v0.7.2 fix retained
 
-- Full pytest suite
-- Python compile check
-- static secret/private-file scan
-- release archive check
-
-# v0.5.1 hotfix
-
-- Fixed Farming/Crafting runtime crash caused by missing `fmt_num` quantity formatter.
-- Added a regression test for quantity formatting.
-
-# Rhodes Planner v0.5.0
-
-A release-candidate build focused on workflow polish before publishing.
-
-## What changed
-
-- Reserve on a T4/T5 material now means **farm its full crafting chain anew**.
-  Owned lower-tier ingredients are intentionally ignored for that reserved
-  requirement.
-- Current-plan rows now have **Edit** and **Remove** actions.
-- Penguin Statistics config is now **copy-first** with a one-click clipboard
-  button instead of a download-first workflow.
-- Planner/farming copy was tightened for a cleaner public-facing build.
-- README and portfolio copy were rewritten to match the current product rather
-  than earlier prototype architecture.
-
-## Validation
-
-- 33 automated tests passing
-- Python syntax check passing
+- Dualchip factory crafting correctly recognizes **2 matching Chip Packs + 1 Chip Catalyst -> 1 Dualchip**.
+- Existing reserve and shared-catalyst behavior remains unchanged.

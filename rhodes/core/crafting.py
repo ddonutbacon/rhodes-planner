@@ -65,6 +65,54 @@ def parse_workshop_recipes(building_raw: dict) -> Dict[str, CraftRecipe]:
     return recipes
 
 
+
+def add_dualchip_factory_recipes(
+    recipes: Dict[str, CraftRecipe],
+    item_meta: Dict[str, dict],
+) -> Dict[str, CraftRecipe]:
+    """Ensure class Dualchip production is represented in crafting logic.
+
+    Arknights Dualchips are produced in the Factory, not the Workshop, so they
+    are not guaranteed to appear in ``workshopFormulas``.  Rhodes detects the
+    relevant item IDs from localized item names and adds the canonical
+    production recipe only when the upstream recipe map does not already
+    provide one:
+
+        2 x <Class> Chip Pack + 1 x Chip Catalyst -> 1 x <Class> Dualchip
+
+    This keeps the logic ID-agnostic and allows ArkPRTS inventory quantities
+    to satisfy E2 Dualchip requirements through virtual crafting.
+    """
+    out = dict(recipes or {})
+    name_to_id = {}
+    for iid, meta in (item_meta or {}).items():
+        if not isinstance(meta, dict):
+            continue
+        name = str(meta.get("name") or "").strip()
+        if name:
+            name_to_id.setdefault(name.casefold(), str(iid))
+
+    catalyst_id = name_to_id.get("chip catalyst")
+    if not catalyst_id:
+        return out
+
+    classes = (
+        "Vanguard", "Guard", "Defender", "Sniper",
+        "Caster", "Medic", "Supporter", "Specialist",
+    )
+    for cls in classes:
+        dual_id = name_to_id.get(f"{cls} Dualchip".casefold())
+        pack_id = name_to_id.get(f"{cls} Chip Pack".casefold())
+        if not dual_id or not pack_id or dual_id in out:
+            continue
+        out[dual_id] = CraftRecipe(
+            output_id=dual_id,
+            output_count=1,
+            ingredients={pack_id: 2, catalyst_id: 1},
+            lmd_cost=0,
+        )
+    return out
+
 def _parse_item_tier(raw) -> int:
     if raw is None:
         return 0

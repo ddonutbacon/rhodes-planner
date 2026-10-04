@@ -2,51 +2,25 @@
 setlocal
 cd /d "%~dp0"
 
-REM Prefer normal Python if available.
-where python >nul 2>&1
-if %errorlevel%==0 goto :normal_python
+set "PYTHON=.venv\Scripts\python.exe"
+if exist "%PYTHON%" goto run
 
-where py >nul 2>&1
-if %errorlevel%==0 (
-    set "PY=py"
-    goto :venv
+where py >nul 2>nul
+if %ERRORLEVEL%==0 (
+    set "PYTHON=py"
+    goto run
 )
 
-REM Fall back to Anaconda launcher if present.
-if exist "run_windows_anaconda.bat" (
-    echo Standard Python was not found.
-    echo Trying the Anaconda launcher instead...
-    call run_windows_anaconda.bat
-    exit /b %errorlevel%
+where python >nul 2>nul
+if %ERRORLEVEL%==0 (
+    set "PYTHON=python"
+    goto run
 )
 
-echo Python was not found.
-echo If you use Anaconda, open Anaconda Prompt and run run_windows_anaconda.bat
+echo Python was not found. For non-technical use, download the portable Windows release instead.
 pause
 exit /b 1
 
-:normal_python
-set "PY=python"
-
-:venv
-if not exist ".venv\Scripts\python.exe" (
-    echo Creating virtual environment...
-    %PY% -m venv .venv
-    if errorlevel 1 goto :error
-)
-
-call .venv\Scripts\activate.bat
-
-echo Installing/updating dependencies...
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-if errorlevel 1 goto :error
-
-echo Starting Rhodes Planner...
-streamlit run app\main.py --server.address=127.0.0.1
-goto :eof
-
-:error
-echo.
-echo Something failed. Copy the text above and send it back for debugging.
-pause
+:run
+%PYTHON% -m streamlit run app\main.py --server.address 127.0.0.1 --browser.gatherUsageStats false
+endlocal

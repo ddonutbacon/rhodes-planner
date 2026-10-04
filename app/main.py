@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import html
 import json
-from pathlib import Path
 import sys
 
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -34,9 +35,10 @@ from rhodes.core.crafting import (
     expand_reserved_requirements,
     merge_farm_expansions,
     parse_workshop_recipes,
+    add_dualchip_factory_recipes,
     simulate_crafting,
 )
-from rhodes.core.farming import build_farming_plan
+from rhodes.core.farming import build_farming_plan, best_stage_for_item
 from rhodes.core.formatting import fmt_num
 from rhodes.core.models import (
     CostBundle,
@@ -86,6 +88,9 @@ div[data-testid="stMetric"] {
 }
 .operator-title {font-size:1.35rem;font-weight:700;}
 .operator-sub {opacity:.72;}
+.mat-chip {display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(128,128,128,.25);border-radius:10px;padding:4px 7px;margin:3px 5px 3px 0;background:rgba(128,128,128,.06);font-weight:600;}
+.mat-chip img {width:30px;height:30px;object-fit:contain;}
+.muted-note {opacity:.65;font-style:italic;}
 </style>
 """,
     unsafe_allow_html=True,
@@ -111,6 +116,38 @@ EXP_VALUES = {
 }
 
 
+def material_chips_html(bundle: CostBundle, item_meta: dict, item_names: dict) -> str:
+    """Compact, traceable material list for operator and aggregate requirements."""
+    chips = []
+    for iid, qty in sorted(
+        bundle.materials.items(),
+        key=lambda kv: item_names.get(kv[0], kv[0]).lower(),
+    ):
+        name = html.escape(str(item_names.get(iid, iid)))
+        icon = html.escape(item_icon_url(iid, item_meta), quote=True)
+        chips.append(
+            f'<span class="mat-chip" title="{name}">'
+            f'<img src="{icon}" alt="{name}">'
+            f'<span>× {html.escape(fmt_num(qty))}</span>'
+            f'</span>'
+        )
+    if not chips:
+        return '<span class="muted-note">No material items required.</span>'
+    return ''.join(chips)
+
+
+def render_cost_breakdown(bundle: CostBundle, item_meta: dict, item_names: dict) -> None:
+    st.markdown(material_chips_html(bundle, item_meta, item_names), unsafe_allow_html=True)
+    aux = []
+    if bundle.lmd:
+        aux.append(f"LMD × {bundle.lmd:,}")
+    if bundle.exp:
+        aux.append(f"EXP × {bundle.exp:,} ({bundle.exp/1000:,.1f} T3 equiv.)")
+    if aux:
+        st.caption(' · '.join(aux))
+
+
+
 def load_sample():
     return json.loads(
         (ROOT / "rhodes/data/sample.json").read_text(encoding="utf-8")
@@ -119,62 +156,44 @@ def load_sample():
 
 @st.cache_data(show_spinner=False)
 def get_live_data(server):
-    chars, items, constants, modules, stage_table, building = fetch_game_data()
+    (
+        chars, items, constants, modules, stage_table, building,
+        en_chars, en_items, en_modules, en_stage_table,
+    ) = fetch_game_data()
 
     penguin_error = None
-
     try:
         matrix = fetch_penguin_matrix(server)
-        stages = normalize_stages(matrix, stage_table)
+        stage_source = stage_table if server == "CN" else en_stage_table
+        stages = normalize_stages(matrix, stage_source)
     except Exception as exc:
         stages = []
         penguin_error = str(exc)
 
     return (
-        chars,
-        items,
-        constants,
-        modules,
-        building,
-        [x.model_dump() for x in stages],
-        penguin_error,
+        chars, items, constants, modules, building, en_chars, en_items, en_modules,
+        [x.model_dump() for x in stages], penguin_error,
     )
 
 
 def get_data(mode, server):
     if mode == "Live":
         (
-            chars,
-            items,
-            constants,
-            modules,
-            building,
-            stage_dicts,
-            penguin_error,
+            chars, items, constants, modules, building, en_chars, en_items, en_modules,
+            stage_dicts, penguin_error,
         ) = get_live_data(server)
-
         return (
-            chars,
-            items,
-            constants,
-            modules,
-            building,
+            chars, items, constants, modules, building, en_chars, en_items, en_modules,
             [StageModel.model_validate(x) for x in stage_dicts],
-            False,
-            penguin_error,
+            False, penguin_error,
         )
 
     sample = load_sample()
-
     return (
-        sample["characters"],
-        sample["items"],
-        sample["constants"],
-        sample["modules"],
-        {},
+        sample["characters"], sample["items"], sample["constants"],
+        sample["modules"], {}, sample["characters"], sample["items"], sample["modules"],
         [StageModel.model_validate(x) for x in sample["stages"]],
-        True,
-        None,
+        True, None,
     )
 
 
@@ -195,10 +214,6 @@ def ensure_state():
         inventory = Inventory.model_validate(saved.get("inventory", {}))
     except Exception:
         inventory = Inventory()
-
-    # Data minimization: Rhodes Planner does not plan gacha resources.
-    inventory.orundum = 0
-    inventory.originite_prime = 0
 
     operators = {}
 
@@ -241,7 +256,7 @@ def ensure_state():
 
 def persist_profile():
     save_profile({
-        "schema_version": 3,
+        "schema_version": 5,
         "profile_epoch": int(st.session_state.get("profile_epoch", 0)),
         "inventory": st.session_state.inventory.model_dump(),
         "operators": {
@@ -307,6 +322,7 @@ def operator_rows(
     selected_classes,
     selected_rarities,
     owned_only,
+    future_only=False,
 ):
     search = str(search_text or "").strip().lower()
     classes = set(selected_classes or [])
@@ -319,12 +335,20 @@ def operator_rows(
 
         if owned_only and not owned:
             continue
+        if future_only and meta.get("available_on_en", True):
+            continue
         if classes and meta.get("class") not in classes:
             continue
         if rarities and meta.get("rarity") not in rarities:
             continue
-        if search and search not in meta.get("name", "").lower():
-            continue
+        if search:
+            haystack = " ".join([
+                str(meta.get("name", "")),
+                str(meta.get("cn_name", "")),
+                str(cid),
+            ]).lower()
+            if search not in haystack:
+                continue
 
         rows.append({
             "Select": False,
@@ -336,6 +360,7 @@ def operator_rows(
             ),
             "Rarity": meta.get("rarity", 0),
             "Owned": "Yes" if owned else "No",
+            "Availability": meta.get("availability", "EN"),
             "Elite": op.elite if op else 0,
             "Level": op.level if op else 1,
             "Char ID": cid,
@@ -372,10 +397,17 @@ def operator_selector_table(
         key=f"{prefix}_rarities",
     )
 
-    owned_only = st.toggle(
+    t1, t2 = st.columns(2)
+    owned_only = t1.toggle(
         "Owned operators only",
         value=owned_default,
         key=f"{prefix}_owned_only",
+    )
+    future_only = t2.toggle(
+        "CN-only operators only",
+        value=False,
+        key=f"{prefix}_future_only",
+        help="Useful for browsing operators that are known in CN data but not yet present in the EN snapshot.",
     )
 
     rows = operator_rows(
@@ -385,6 +417,7 @@ def operator_selector_table(
         classes,
         rarities,
         owned_only,
+        future_only,
     )
 
     if not rows:
@@ -401,6 +434,7 @@ def operator_selector_table(
             "Class",
             "Rarity",
             "Owned",
+            "Availability",
             "Elite",
             "Level",
             "Char ID",
@@ -505,10 +539,12 @@ with st.sidebar:
         index=0,
     )
     server = st.selectbox(
-        "Penguin server",
+        "Farming server (Penguin)",
         ["US", "JP", "KR", "CN"],
         index=0,
+        help="Controls farming/drop availability only. The operator progression catalog always uses the latest CN game data.",
     )
+    st.caption("Planner knowledge: latest CN · EN snapshot used for availability/localization")
 
     if st.button("Clear downloaded public-data cache"):
         clear_cache()
@@ -517,7 +553,7 @@ with st.sidebar:
 
     st.divider()
     st.markdown("**Local profile**")
-    st.caption(f"Auto-save: {profile_path()}")
+    st.caption("Auto-save: private OS user application-data directory")
 
     confirm_nuke = st.checkbox(
         "I understand this permanently clears my saved Rhodes profile",
@@ -535,7 +571,6 @@ with st.sidebar:
     with st.expander("Diagnostics / bug report"):
         diagnostic = {
             "rhodes_version": __version__,
-            "profile_path": str(profile_path()),
             "profile_exists": profile_path().exists(),
             "operators": len(st.session_state.operators),
             "inventory_entries": len(st.session_state.inventory.materials),
@@ -544,9 +579,7 @@ with st.sidebar:
                 if value > 0
             ),
             "goals": len(st.session_state.goals),
-            "lmd": int(st.session_state.inventory.lmd),
-            "exp_points": int(st.session_state.inventory.exp),
-            "profile_epoch": int(st.session_state.get("profile_epoch", 0)),
+                        "profile_epoch": int(st.session_state.get("profile_epoch", 0)),
         }
         st.json(diagnostic)
         st.download_button(
@@ -556,28 +589,22 @@ with st.sidebar:
             mime="application/json",
         )
         st.caption(
-            "This diagnostic contains counts and resource totals, not the raw "
-            "ARKprts export or account identifiers."
+            "This diagnostic contains structural counts only, not the raw "
+            "ArkPRTS export, currencies, inventory quantities, or account identifiers."
         )
 
     st.divider()
     st.markdown("**External sources**")
     st.caption("ArknightsAssets / ArknightsGamedata")
     st.caption("Penguin Statistics")
-    st.caption("ARKprts full-account export")
+    st.caption("ArkPRTS full-account export")
     st.caption("Community image repositories")
 
 try:
     with st.spinner("Loading game data..."):
         (
-            chars,
-            items,
-            constants,
-            modules,
-            building,
-            stages,
-            is_demo,
-            penguin_error,
+            chars, items, constants, modules, building, en_chars, en_items, en_modules,
+            stages, is_demo, penguin_error,
         ) = get_data(mode, server)
 except Exception as exc:
     st.error(
@@ -586,28 +613,38 @@ except Exception as exc:
     )
     st.code(str(exc))
     (
-        chars,
-        items,
-        constants,
-        modules,
-        building,
-        stages,
-        is_demo,
-        penguin_error,
+        chars, items, constants, modules, building, en_chars, en_items, en_modules,
+        stages, is_demo, penguin_error,
     ) = get_data("Offline demo", server)
 
-catalog = operator_catalog(chars)
-item_meta = build_item_metadata_map(items)
+catalog = operator_catalog(chars, en_chars)
+item_meta = build_item_metadata_map(items, en_items)
+en_item_meta = build_item_metadata_map(en_items)
 item_names = {
     iid: meta["name"]
     for iid, meta in item_meta.items()
 }
+
+# Refresh persisted display names from the current localization layer.
+# v0.7.0 could save raw CN names for future operators; IDs remain the source
+# of truth, so existing plans can be upgraded in place without re-adding them.
+for _goal in st.session_state.goals:
+    _cid = str(_goal.get("operator_id") or "")
+    if _cid in catalog:
+        _goal["operator"] = catalog[_cid]["name"]
+for _cid, _op in st.session_state.operators.items():
+    if _cid in catalog:
+        _op.name = catalog[_cid]["name"]
+
 advancement_ids = advancement_item_ids(
     chars,
     modules,
     item_meta,
 )
-recipes = parse_workshop_recipes(building)
+recipes = add_dualchip_factory_recipes(
+    parse_workshop_recipes(building),
+    item_meta,
+)
 
 if is_demo:
     st.warning(
@@ -660,6 +697,9 @@ runtime.
 - **Penguin Statistics / ArkPlanner**  \n  Reference project for farming-planner concepts and Penguin planner
   interoperability. ArkPlanner is distributed under the MIT License.  \n  https://github.com/penguin-statistics/ArkPlanner
 
+### Recommended external pull calculator
+- **imivi / Arknights Pulls Calculator**  \n  Rhodes Planner does not include an internal pull calculator in v0.7.3. For pull-resource forecasting, this community tool is recommended as a separate companion utility.  \n  https://imivi.github.io/arknights-pulls-calculator/  \n  Source: https://github.com/imivi/arknights-pulls-calculator
+
 ### Account export ecosystem
 - **ArkPRTS** by its community maintainers  \n  Users may generate account data outside Rhodes Planner and import the
   resulting JSON here. ArkPRTS is GPL-3.0 licensed. Rhodes Planner does not
@@ -680,6 +720,9 @@ Rhodes Planner is built with open-source Python tooling including **Streamlit,
 Pydantic, pandas, requests, and platformdirs**. Their respective licenses and
 notices remain with their maintainers.
 
+### AI-assisted development
+OpenAI's ChatGPT served as the primary AI-assisted development partner for prototyping, implementation, debugging, refactoring and testing. Product direction, requirements, validation, UX and release decisions were directed and reviewed by the project author.
+
 ### Thanks
 Thanks to the Arknights community members who collect drop samples, maintain
 game-data dumps, document account schemas, and keep utility projects alive.
@@ -692,6 +735,7 @@ Rhodes Planner would not be useful without that work.
 # =====================================================================
 elif page == "Dashboard":
     st.subheader("Overview")
+    future_count = sum(1 for meta in catalog.values() if not meta.get("available_on_en", True))
 
     imported_count = len(st.session_state.operators)
     depot_count = sum(
@@ -706,6 +750,8 @@ elif page == "Dashboard":
     c3.metric("Depot materials", f"{depot_count:,}")
     c4.metric("Planned upgrades", f"{len(st.session_state.goals):,}")
     c5.metric("Crafting recipes", f"{len(recipes):,}")
+
+    st.caption(f"Planner catalog: {len(catalog):,} latest-CN operators · {future_count:,} currently absent from the EN snapshot.")
 
     if imported_count or depot_count or st.session_state.goals:
         st.caption(
@@ -726,25 +772,25 @@ elif page == "Dashboard":
 elif page == "Account":
     st.subheader("Account state")
 
-    st.markdown("#### Import ARKprts full data export")
+    st.markdown("#### Import ArkPRTS full data export")
     st.info(
-        "Keep the raw ARKprts export private. Rhodes Planner stores only "
+        "Keep the raw ArkPRTS export private. Rhodes Planner stores only "
         "the normalized roster/depot/planning state, not the raw file."
     )
 
     ark_file = st.file_uploader(
-        "ARKprts full data export (.json)",
+        "ArkPRTS full data export (.json)",
         type=["json"],
         key="arkprts_upload",
     )
 
     if ark_file is not None and st.button(
-        "Import ARKprts export",
+        "Import ArkPRTS export",
         type="primary",
     ):
         try:
             if getattr(ark_file, "size", 0) > 25 * 1024 * 1024:
-                raise ValueError("ARKprts export exceeds the 25 MB limit.")
+                raise ValueError("ArkPRTS export exceeds the 25 MB limit.")
 
             payload = json.load(ark_file)
             inv, ops, meta = parse_arkprts_full_export(payload)
@@ -771,9 +817,6 @@ elif page == "Account":
                     "2001": 200, "2002": 400, "2003": 1000, "2004": 2000
                 }.items()
             )
-            inv.orundum = 0
-            inv.originite_prime = 0
-
             for cid, op in ops.items():
                 if cid in catalog:
                     op.name = catalog[cid]["name"]
@@ -797,7 +840,7 @@ elif page == "Account":
                 )
 
         except Exception as exc:
-            st.error(f"ARKprts import failed: {exc}")
+            st.error(f"ArkPRTS import failed: {exc}")
 
     if st.session_state.operators:
         operators = st.session_state.operators
@@ -920,6 +963,7 @@ elif page == "Account":
         module_defs = module_catalog_for_operator(
             modules,
             manual_cid,
+            en_modules,
         )
         module_levels = {}
 
@@ -1189,6 +1233,20 @@ elif page == "Planner":
             },
         )
 
+        st.markdown("#### Materials required by operator")
+        st.caption("Exact progression requirements for each saved goal before stash/crafting reductions.")
+        for goal, raw_cost in zip(st.session_state.goals, st.session_state.costs):
+            bundle = CostBundle.model_validate(raw_cost)
+            with st.container(border=True):
+                c_op, c_goal = st.columns([2.2, 3.8])
+                c_op.markdown(f'**{goal["operator"]}**')
+                t = goal["target"]
+                c_goal.caption(
+                    f'E{t["elite"]} Lv{t["level"]} · Skill {t["skill_level"]} · '
+                    f'S1 M{t["mastery"]["s1"]} / S2 M{t["mastery"]["s2"]} / S3 M{t["mastery"]["s3"]}'
+                )
+                render_cost_breakdown(bundle, item_meta, item_names)
+
         st.caption("Plan actions")
         for idx, goal in enumerate(st.session_state.goals):
             a1, a2, a3 = st.columns([5, 1.15, 1.15])
@@ -1253,13 +1311,14 @@ elif page == "Planner":
     else:
         st.markdown("### Add an operator")
         st.caption(
-            "Filter by name, class, rarity, or ownership, then tick one operator."
+            "Filter by name, class, rarity, or ownership, then tick one operator. "
+        "The catalog uses the latest CN data, so CN-only operators can be pre-planned."
         )
         cid = operator_selector_table(
             "planner_operator",
             catalog,
             st.session_state.operators,
-            owned_default=bool(st.session_state.operators),
+            owned_default=False,
         )
 
     if cid:
@@ -1292,6 +1351,7 @@ elif page == "Planner":
         safe_name = html.escape(str(selected_name))
         safe_class = html.escape(str(selected.get("class", "")))
         safe_source = html.escape(account_source)
+        availability = html.escape(str(selected.get("availability", "EN")))
 
         st.markdown(
             f"""
@@ -1302,7 +1362,7 @@ elif page == "Planner":
                     <div class="operator-sub">
                         {"★" * rarity} · {safe_class}
                     </div>
-                    <div class="operator-sub">{safe_source}</div>
+                    <div class="operator-sub">{safe_source} · {availability}</div>
                 </div>
             </div>
             """,
@@ -1321,7 +1381,7 @@ elif page == "Planner":
         m2.metric("S2 mastery", existing.mastery.s2)
         m3.metric("S3 mastery", existing.mastery.s3)
 
-        module_defs = module_catalog_for_operator(modules, cid)
+        module_defs = module_catalog_for_operator(modules, cid, en_modules)
 
         if module_defs:
             current_module_text = []
@@ -1466,7 +1526,7 @@ elif page == "Planner":
                     module_level=target_module_level,
                 )
 
-                model = build_operator_cost_model(cid, chars, modules)
+                model = build_operator_cost_model(cid, chars, modules, en_modules)
                 cost = calculate_upgrade_cost(
                     current=existing,
                     target=target,
@@ -1541,6 +1601,17 @@ elif page == "Farming":
         )
 
         with req_tab:
+            st.markdown("### Requirements by operator")
+            st.caption("See which operator creates each material requirement before Rhodes combines the plan.")
+            for goal, bundle in zip(st.session_state.goals, costs):
+                with st.container(border=True):
+                    st.markdown(f'**{goal["operator"]}**')
+                    render_cost_breakdown(bundle, item_meta, item_names)
+
+            st.markdown("### Combined total requirements")
+            render_cost_breakdown(total, item_meta, item_names)
+            st.caption("The editable table below is the same combined total, with stash and availability context added.")
+
             st.markdown("### Resource policy")
             st.caption(
                 "Reserve stash means: do not spend what I already own. For a "
@@ -1622,6 +1693,7 @@ elif page == "Farming":
                     "Item": item_names.get(iid, iid),
                     "Required": qty,
                     "Owned": owned_qty,
+                    "Availability": ("EN" if iid in en_item_meta else "CN only / future EN"),
                     "Need before crafting": (
                         qty
                         if reserve
@@ -1639,6 +1711,7 @@ elif page == "Farming":
                     "Item",
                     "Required",
                     "Owned",
+                    "Availability",
                     "Need before crafting",
                     "Item ID",
                 ],
@@ -1954,6 +2027,25 @@ elif page == "Farming":
                 stages,
             )
 
+            unavailable_targets = {
+                iid: qty for iid, qty in final_deficit.materials.items()
+                if qty > 0 and best_stage_for_item(iid, stages) is None
+            }
+            if unavailable_targets:
+                st.warning(
+                    "Some required materials have no farming source in the selected "
+                    "Penguin server dataset yet. This is expected for future/CN-only "
+                    "content; the requirement is preserved rather than guessed."
+                )
+                st.dataframe(pd.DataFrame([
+                    {
+                        "Material": item_names.get(iid, iid),
+                        "Required to farm": qty,
+                        "Availability": ("CN only / future EN" if iid not in en_item_meta else "Farming data pending"),
+                    }
+                    for iid, qty in sorted(unavailable_targets.items(), key=lambda kv: item_names.get(kv[0], kv[0]).lower())
+                ]), use_container_width=True, hide_index=True)
+
             if not stages and not is_demo:
                 st.warning(
                     "Live drop statistics are unavailable, "
@@ -2107,13 +2199,13 @@ elif page == "Farming":
 # About
 # =====================================================================
 elif page == "About":
-    st.subheader("About this build")
+    st.subheader(f"About this build · v{__version__}")
 
     st.markdown(
         """
 ### Data flow
 
-**ARKprts/manual account state**  
+**ArkPRTS/manual account state**  
 → **persistent local profile**  
 → **hard current-state floor**  
 → **operator upgrade goals**  
@@ -2123,11 +2215,13 @@ elif page == "About":
 → **passive base production**  
 → **stage recommendations**
 
+The progression knowledge base uses latest CN data; the EN snapshot is used for localization/availability, while Penguin server selection controls current farming recommendations.
+
 ### Local persistence
 
 Rhodes Planner auto-saves the normalized roster, depot, upgrade plans and
 planner settings into your Windows user application-data folder. The raw
-ARKprts export is not persisted by Rhodes Planner. Use the **Nuke / clear local
+ArkPRTS export is not persisted by Rhodes Planner. Use the **Nuke / clear local
 profile** button in the sidebar to delete the saved profile.
 
 ### EXP convention

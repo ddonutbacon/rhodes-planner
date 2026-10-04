@@ -62,7 +62,7 @@ def build_penguin_planner_config_payload(
         for iid, qty in inventory.materials.items()
     }
 
-    # ARKprts stores LMD separately from normal inventory.
+    # ArkPRTS stores LMD separately from normal inventory.
     have["4001"] = max(0, int(inventory.lmd or 0))
 
     for iid, count in inventory.exp_cards.items():

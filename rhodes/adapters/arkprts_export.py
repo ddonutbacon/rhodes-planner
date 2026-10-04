@@ -94,18 +94,18 @@ def parse_arkprts_full_export(payload: Dict[str, Any]) -> Tuple[Inventory, Dict[
     - Only planner-relevant account state is retained.
     """
     if not isinstance(payload, dict):
-        raise ValueError("ARKprts export must be a JSON object.")
+        raise ValueError("ArkPRTS export must be a JSON object.")
 
     status = payload.get("status")
     inventory_raw = payload.get("inventory")
     troop = payload.get("troop")
 
     if not isinstance(status, dict):
-        raise ValueError("Missing ARKprts status object.")
+        raise ValueError("Missing ArkPRTS status object.")
     if not isinstance(inventory_raw, dict):
-        raise ValueError("Missing ARKprts inventory object.")
+        raise ValueError("Missing ArkPRTS inventory object.")
     if not isinstance(troop, dict) or not isinstance(troop.get("chars"), dict):
-        raise ValueError("Missing ARKprts troop.chars object.")
+        raise ValueError("Missing ArkPRTS troop.chars object.")
 
     materials = {}
     exp_cards = {}
@@ -131,9 +131,6 @@ def parse_arkprts_full_export(payload: Dict[str, Any]) -> Tuple[Inventory, Dict[
         lmd=int(status.get("gold", 0) or 0),
         exp=exp_points,
         exp_cards=exp_cards,
-        orundum=int(status.get("diamondShard", 0) or 0),
-        originite_prime=int(status.get("freeDiamond", 0) or 0)
-        + int(status.get("payDiamond", 0) or 0),
         materials=materials,
     )
 
@@ -212,7 +209,7 @@ def parse_arkprts_full_export(payload: Dict[str, Any]) -> Tuple[Inventory, Dict[
         stage_records = len(dungeon["stages"])
 
     metadata = {
-        "source": "ARKprts full data export",
+        "source": "ArkPRTS full data export",
         "account_level": int(status.get("level", 0) or 0),
         "server_name": status.get("serverName"),
         "operator_count": len(operators),

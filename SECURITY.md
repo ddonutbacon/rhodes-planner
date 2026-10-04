@@ -1,85 +1,39 @@
-# Rhodes Planner Security & Privacy
+# Security and Privacy
 
-## Current model
+Rhodes Planner is designed as a **local-first personal tool**, not as a hardened public multi-user service.
 
-Rhodes Planner is designed as a local-first application. The Windows launchers
-bind Streamlit to `127.0.0.1`, so another device on the LAN cannot connect
-unless the user deliberately changes the server configuration.
+## Default exposure
 
-## ArkPRTS data
+The bundled launcher binds Streamlit to `127.0.0.1`. The default `.streamlit/config.toml` keeps XSRF and CORS protections enabled, disables telemetry, and limits uploads to 25 MB.
 
-ArkPRTS full exports can contain more account information than Rhodes Planner
-needs. The importer:
+## ArkPRTS imports
 
-- parses the uploaded JSON in the running process;
-- does not write the raw export to disk;
-- does not retain UID, nickname, friends/social data or authentication data in
-  the normalised planner model;
-- persists only normalised roster/depot/planning state locally so the personal toolkit survives restarts;
-- writes only public game/drop data to the disk cache;
-- never asks for game-account passwords or email verification codes.
+Rhodes Planner accepts user-supplied ArkPRTS JSON exports. The raw upload is parsed in memory and is not intentionally written to disk by Rhodes Planner. The normalized local profile keeps only data needed by active planner features, such as operator progression, advancement inventory, LMD/EXP, saved upgrade goals and planner settings. Pull currencies are not retained by v0.7.3.
 
-The plan/export buttons create a file only when the user explicitly requests it.
+Rhodes Planner does not request or store game-login credentials, verification codes, authentication tokens or ArkPRTS sessions.
 
-## External requests
+Never post a real ArkPRTS export in a public GitHub issue.
 
-Rhodes Planner uses hard-coded HTTPS endpoints for public game data, Penguin
-Statistics data and community image assets. The ArkPRTS export itself is not
-sent to those services.
+## Local profile
 
-Remote images are loaded by the user's browser from public GitHub raw-content
-hosts, so those hosts receive normal browser/IP metadata.
+The normalized profile is stored under the operating system's per-user application-data directory using `platformdirs`. It is plaintext and is **not encrypted at rest**. Anyone with access to the user's operating-system account/files may be able to read it.
 
-## Controls currently enabled
+Use **Nuke / clear local profile** in the sidebar to remove the persisted Rhodes profile.
 
-- local-only `127.0.0.1` binding in local launchers;
-- XSRF protection enabled;
-- CORS protection enabled;
-- Streamlit usage telemetry disabled;
-- 25 MB upload cap;
-- JSON-only account parsing;
-- no `eval`, `exec`, pickle deserialisation or uploaded-data-driven shell calls;
-- fixed external data URLs;
-- HTML escaping for account/operator text inserted into custom HTML.
+## Network requests
 
-## Remaining risks before public hosting
+Runtime requests are limited to application-defined public sources for game data, drop statistics and community-hosted images. User-supplied JSON is not allowed to provide arbitrary URLs for Rhodes to fetch. Remote operator/material images are loaded from community hosts, so normal network metadata such as the user's IP address may be visible to those hosts.
 
-A public deployment should add authentication, HTTPS termination, explicit
-session expiry, a documented data-retention/deletion policy, secrets management,
-rate limits, structured logging review, JSON complexity limits, dependency
-locking/scanning, and release signing/checksums.
+## Defensive implementation
 
-For maximum privacy, a hosted version should also proxy/cache approved image
-assets rather than loading them directly in the browser.
+The codebase avoids dynamic execution/deserialization of uploaded content. Regression tests scan source code for dangerous patterns including `eval`, `exec`, pickle loading, unsafe YAML loading, `os.system`, and `shell=True`.
 
-## Bug reports
+GitHub security automation is provided for dependency auditing and static analysis. A green workflow is still not equivalent to a professional penetration test.
 
-Do not attach a full real ArkPRTS export to a public GitHub issue. Redact
-identifiers and provide only the smallest JSON fragment needed to reproduce the
-problem.
+## Public hosting
 
+Do not assume this build is safe for public multi-user hosting. A hosted service would need, at minimum, authentication, HTTPS, session isolation/expiry, rate limiting, server-side retention rules, stronger logging review, secure secret management, and additional abuse/complexity controls.
 
-## Local profile persistence
+## Reporting a security issue
 
-Rhodes Planner stores the normalized local toolkit profile in the user's
-application-data directory. The raw ArkPRTSs JSON is not persisted.
-
-The local profile is **not encrypted at rest**. Anyone who already has access
-to the user's Windows account/files can read the normalised roster, depot and
-planning state. The sidebar provides a dedicated **Nuke / clear local profile**
-control that deletes this file.
-
-Rhodes Planner also discards Orundum and Originite Prime from the normalised local profile because those currencies are outside the current progression/farming scope.
-
-
-## Automated repository checks
-
-The GitHub Actions security workflow runs:
-
-- `pip-audit` against `requirements.txt`;
-- `bandit` against the `rhodes/` and `app/` Python source trees;
-- the normal pytest suite runs separately on pushes and pull requests;
-- Dependabot checks Python and GitHub Actions dependencies weekly.
-
-These checks reduce supply-chain/static-code risk but do not replace manual
-review or make a future public-hosted deployment automatically safe.
+Please report security issues privately to the maintainer rather than attaching real account exports, diagnostics, credentials or tokens to a public issue.

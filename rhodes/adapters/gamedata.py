@@ -4,16 +4,42 @@ from typing import Any, Dict
 from .http import get_json
 from rhodes.core.models import CostBundle, OperatorCostModel
 
-BASE = "https://raw.githubusercontent.com/ArknightsAssets/ArknightsGamedata/master/en/gamedata/excel"
-
-URLS = {
-    "characters": f"{BASE}/character_table.json",
-    "items": f"{BASE}/item_table.json",
-    "constants": f"{BASE}/gamedata_const.json",
-    "modules": f"{BASE}/uniequip_table.json",
-    "stages": f"{BASE}/stage_table.json",
-    "building": f"{BASE}/building_data.json",
+REGION_BASES = {
+    "EN": "https://raw.githubusercontent.com/ArknightsAssets/ArknightsGamedata/master/en/gamedata/excel",
+    "CN": "https://raw.githubusercontent.com/ArknightsAssets/ArknightsGamedata/master/cn/gamedata/excel",
 }
+
+# Secondary CN snapshot used only if the primary community mirror is temporarily
+# unavailable. Rhodes never bundles these datasets.
+CN_FALLBACK_BASE = "https://raw.githubusercontent.com/Kengxxiao/ArknightsGameData/master/zh_CN/gamedata/excel"
+
+
+# Community English display aliases for CN-only progression materials that do
+# not yet have an official EN game-data entry. These are display-only aliases;
+# item IDs and all progression/crafting logic continue to come from game data.
+# Keep this map small and evidence-based.
+COMMUNITY_EN_ITEM_ALIASES = {
+    "电极单元": "Electrode Unit",
+    "液化高能气体": "Liquefied High-Energy Gas",
+    "液化醚吸聚体": "Liquefied Ether Agglomerate",
+    "聚能动力单元": "Concentrated Power Unit",
+}
+
+
+def _community_item_alias(name: str) -> str:
+    return COMMUNITY_EN_ITEM_ALIASES.get(str(name or ""), str(name or ""))
+
+
+def _region_urls(region: str):
+    base = REGION_BASES[region]
+    return {
+        "characters": f"{base}/character_table.json",
+        "items": f"{base}/item_table.json",
+        "constants": f"{base}/gamedata_const.json",
+        "modules": f"{base}/uniequip_table.json",
+        "stages": f"{base}/stage_table.json",
+        "building": f"{base}/building_data.json",
+    }
 
 
 def _cost_list_to_bundle(rows) -> CostBundle:
@@ -163,37 +189,73 @@ def advancement_item_ids(characters_raw, modules_raw, item_meta) -> set[str]:
         if 1 <= tier <= 5:
             filtered.add(iid)
 
+    # Dualchips are manufactured from Chip Packs + Chip Catalyst. Chip Catalyst
+    # is not a direct operator-cost item, so include it explicitly in the
+    # editable depot when it exists in the current game-data snapshot.
+    for iid, meta in (item_meta or {}).items():
+        if str((meta or {}).get("name") or "").strip().casefold() == "chip catalyst":
+            filtered.add(str(iid))
+
     return filtered
 
 
-def fetch_game_data():
-    characters = get_json(URLS["characters"], "character_table", 24)
-    items = get_json(URLS["items"], "item_table", 24)
-    constants = get_json(URLS["constants"], "gamedata_const", 24)
-    modules = get_json(URLS["modules"], "uniequip_table", 24)
-    stages = get_json(URLS["stages"], "stage_table", 24)
+def _fetch_region(region: str):
+    region = str(region).upper()
+    urls = _region_urls(region)
 
-    # Crafting is optional: failure here must not disable the main planner.
+    def fetch(name: str, hours: int = 24):
+        try:
+            return get_json(urls[name], f"{region.lower()}_{name}", hours)
+        except Exception:
+            if region != "CN":
+                raise
+            fallback = f"{CN_FALLBACK_BASE}/{urls[name].rsplit('/', 1)[-1]}"
+            return get_json(fallback, f"cn_fallback_{name}", hours)
+
+    characters = fetch("characters")
+    items = fetch("items")
+    constants = fetch("constants")
+    modules = fetch("modules")
+    stages = fetch("stages")
     try:
-        building = get_json(URLS["building"], "building_data", 24)
+        building = fetch("building")
     except Exception:
         building = {}
-
     return characters, items, constants, modules, stages, building
 
 
-def build_item_metadata_map(items_raw) -> Dict[str, dict]:
+def fetch_game_data():
+    """Return a CN-complete planning snapshot plus current EN availability data.
+
+    CN is the planner knowledge base so Global/EN users can pre-plan operators,
+    materials and crafting chains before release. EN remains an availability
+    reference and is not used to truncate the planner catalog. Only the EN
+    tables needed for localization/availability are fetched.
+    """
+    cn = _fetch_region("CN")
+    en_urls = _region_urls("EN")
+    en_characters = get_json(en_urls["characters"], "en_characters", 24)
+    en_items = get_json(en_urls["items"], "en_items", 24)
+    en_modules = get_json(en_urls["modules"], "en_modules", 24)
+    en_stages = get_json(en_urls["stages"], "en_stages", 24)
+    return (*cn, en_characters, en_items, en_modules, en_stages)
+
+
+def build_item_metadata_map(items_raw, localized_items_raw=None) -> Dict[str, dict]:
     items = _unwrap_items(items_raw)
+    localized = _unwrap_items(localized_items_raw) if localized_items_raw is not None else {}
     out = {}
 
     for iid, row in items.items():
         if not isinstance(row, dict):
             continue
 
+        local_row = localized.get(str(iid), {}) if isinstance(localized, dict) else {}
         out[str(iid)] = {
             "id": str(iid),
-            "name": str(row.get("name") or iid),
-            "icon_id": str(row.get("iconId") or iid),
+            "name": str(local_row.get("name") or _community_item_alias(row.get("name")) or iid),
+            "cn_name": str(row.get("name") or iid),
+            "icon_id": str(local_row.get("iconId") or row.get("iconId") or iid),
             "rarity": row.get("rarity"),
             "item_type": row.get("itemType"),
             "classify_type": row.get("classifyType"),
@@ -209,7 +271,7 @@ def build_item_name_map(items_raw) -> Dict[str, str]:
     }
 
 
-def operator_catalog(characters_raw) -> Dict[str, dict]:
+def operator_catalog(characters_raw, en_characters_raw=None) -> Dict[str, dict]:
     out = {}
 
     for cid, row in (characters_raw or {}).items():
@@ -226,12 +288,17 @@ def operator_catalog(characters_raw) -> Dict[str, dict]:
 
         rarity = _parse_rarity(row.get("rarity"))
 
+        en_row = (en_characters_raw or {}).get(cid) if isinstance(en_characters_raw, dict) else None
+        display_name = (en_row or {}).get("name") or row.get("appellation") or name
         out[cid] = {
             "id": cid,
-            "name": name,
+            "name": display_name,
+            "cn_name": name,
             "rarity": max(1, min(6, rarity)),
             "profession": profession,
             "class": profession_label(profession),
+            "availability": "EN" if isinstance(en_row, dict) else "CN only",
+            "available_on_en": isinstance(en_row, dict),
         }
 
     return out
@@ -245,13 +312,14 @@ def phase_max_level(constants: dict, rarity: int, elite: int) -> int:
         return {0: 50, 1: 80, 2: 90}.get(elite, 90)
 
 
-def module_catalog_for_operator(modules_raw, char_id: str) -> Dict[str, dict]:
+def module_catalog_for_operator(modules_raw, char_id: str, localized_modules_raw=None) -> Dict[str, dict]:
     result = {}
 
     if not isinstance(modules_raw, dict):
         return result
 
     equip_dict = modules_raw.get("equipDict", {})
+    local_equip = (localized_modules_raw or {}).get("equipDict", {}) if isinstance(localized_modules_raw, dict) else {}
     if not isinstance(equip_dict, dict):
         return result
 
@@ -263,9 +331,10 @@ def module_catalog_for_operator(modules_raw, char_id: str) -> Dict[str, dict]:
         if str(row.get("type") or "").upper() == "INITIAL":
             continue
 
+        local_row = local_equip.get(module_id, {}) if isinstance(local_equip, dict) else {}
         result[str(module_id)] = {
             "id": str(module_id),
-            "name": str(row.get("uniEquipName") or module_id),
+            "name": str(local_row.get("uniEquipName") or row.get("uniEquipName") or module_id),
             "type_1": str(row.get("typeName1") or ""),
             "type_2": str(row.get("typeName2") or ""),
             "order": int(row.get("charEquipOrder") or 999),
@@ -277,7 +346,7 @@ def module_catalog_for_operator(modules_raw, char_id: str) -> Dict[str, dict]:
     )
 
 
-def _parse_module_costs(modules_raw, char_id: str):
+def _parse_module_costs(modules_raw, char_id: str, localized_modules_raw=None):
     names: Dict[str, str] = {}
     result: Dict[str, Dict[int, CostBundle]] = {}
 
@@ -285,6 +354,7 @@ def _parse_module_costs(modules_raw, char_id: str):
         return names, result
 
     equip_dict = modules_raw.get("equipDict", {})
+    local_equip = (localized_modules_raw or {}).get("equipDict", {}) if isinstance(localized_modules_raw, dict) else {}
     if not isinstance(equip_dict, dict):
         return names, result
 
@@ -295,7 +365,8 @@ def _parse_module_costs(modules_raw, char_id: str):
             continue
 
         module_id = str(module_id)
-        names[module_id] = str(mod.get("uniEquipName") or module_id)
+        local_mod = local_equip.get(module_id, {}) if isinstance(local_equip, dict) else {}
+        names[module_id] = str(local_mod.get("uniEquipName") or mod.get("uniEquipName") or module_id)
 
         item_cost = mod.get("itemCost") or {}
         per_level: Dict[int, CostBundle] = {}
@@ -319,7 +390,7 @@ def _parse_module_costs(modules_raw, char_id: str):
     return names, result
 
 
-def build_operator_cost_model(char_id: str, characters_raw, modules_raw) -> OperatorCostModel:
+def build_operator_cost_model(char_id: str, characters_raw, modules_raw, localized_modules_raw=None) -> OperatorCostModel:
     row = characters_raw[char_id]
     rarity = _parse_rarity(row.get("rarity"))
 
@@ -357,7 +428,7 @@ def build_operator_cost_model(char_id: str, characters_raw, modules_raw) -> Oper
 
         mastery_costs[f"s{s_idx}"] = per_skill
 
-    module_names, module_costs_by_id = _parse_module_costs(modules_raw, char_id)
+    module_names, module_costs_by_id = _parse_module_costs(modules_raw, char_id, localized_modules_raw)
 
     return OperatorCostModel(
         operator_id=char_id,

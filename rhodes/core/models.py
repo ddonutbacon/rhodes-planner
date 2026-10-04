@@ -20,8 +20,6 @@ class Inventory(BaseModel):
     lmd: int = Field(default=0, ge=0)
     exp: int = Field(default=0, ge=0)
     exp_cards: Dict[str, int] = Field(default_factory=dict)
-    orundum: int = Field(default=0, ge=0)
-    originite_prime: int = Field(default=0, ge=0)
     materials: Dict[str, float] = Field(default_factory=dict)
 
 
