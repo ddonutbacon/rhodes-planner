@@ -45,34 +45,6 @@ python -m pip install -r requirements-dev.txt
 python -m streamlit run app\main.py --server.address 127.0.0.1
 ```
 
-## How future planning works
-
-Rhodes separates the **planner knowledge base** from the user's current server/account state.
-
-```text
-Current account / ArkPRTS export
-        ↓
-what you actually own
-
-Latest CN game data
-        ↓
-all known operator progression + crafting dependencies
-
-Selected Penguin server
-        ↓
-what can actually be farmed there right now
-```
-
-An EN player can therefore plan a CN-only operator. If that operator requires a new CN material, Rhodes keeps that material in the requirement chain even if no EN farming source exists yet.
-
-Possible states include:
-
-- available on EN and farmable now
-- known on CN, not yet available on EN
-- requirement known, farming data pending
-
-Rhodes does **not** silently substitute old recipes or invent farming stages.
-
 ## Account import and privacy
 
 Rhodes Planner can import a user-supplied **ArkPRTS full-account JSON export**. The raw file is parsed in memory and is not intentionally persisted by Rhodes Planner.
