@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:transparent;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+.nav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:1px 0 4px}
+button{
+  border:1px solid #343b47;background:#11151d;color:#dce2ea;padding:9px 16px;
+  border-radius:8px;cursor:pointer;font-size:14px;font-weight:600
+}
+button:hover{background:#171d27;border-color:#586273}
+button.active{background:#1f4f8f;border-color:#3887ef;color:#fff}
+</style>
+</head>
+<body>
+<div id="nav" class="nav"></div>
+<script>
+const READY="streamlit:componentReady";
+const RENDER="streamlit:render";
+const VALUE="streamlit:setComponentValue";
+const HEIGHT="streamlit:setFrameHeight";
+let props={items:[],selected:"Planner"};
+function send(type,data){window.parent.postMessage(Object.assign({isStreamlitMessage:true,type:type},data),"*")}
+function draw(){
+  const nav=document.getElementById("nav");
+  nav.innerHTML=(props.items||[]).map(item =>
+    `<button class="${item===props.selected?"active":""}" data-item="${item}">${item}</button>`
+  ).join("");
+  nav.querySelectorAll("button").forEach(btn => btn.onclick=()=>{
+    props.selected=btn.dataset.item;
+    send(VALUE,{value:props.selected,dataType:"json"});
+    draw();
+  });
+  send(HEIGHT,{height:48});
+}
+window.addEventListener("message",e=>{
+  if(!e.data||e.data.type!==RENDER)return;
+  props=Object.assign(props,e.data.args||{});
+  draw();
+});
+send(READY,{apiVersion:1});
+send(HEIGHT,{height:48});
+</script>
+</body>
+</html>

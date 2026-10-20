@@ -1,19 +1,52 @@
-# Rhodes Planner v0.7.3
+# Rhodes Planner v0.8.0
 
-## Portable-path and launcher resilience
+## Main changes
 
-- The portable app no longer depends on the root folder being named `portable`.
-- The entire Rhodes Planner folder can be renamed or moved to another writable location or drive without changing internal paths.
-- The Windows launcher resolves the bundled Python runtime and application from its own location, not from the caller's current working directory.
-- Startup now uses a Python launcher that selects port 8501 when available and automatically falls back to the next free local port through 8599.
-- Browser launch follows the actual selected local port.
-- Missing runtime/application files now produce explicit path diagnostics.
-- The portable build filename is generated from `rhodes.__version__`, preventing stale release names.
-- Project/package metadata and the HTTP User-Agent now report the same application version.
-- HTTP cache writes are atomic. A malformed or partially written cache file is discarded and refreshed instead of preventing startup.
-- Cache failures are treated as non-fatal because the cache is an optimization, not user data.
+- Reworked the UI around a fast **Home → Account → Planner → Farming** workflow.
+- Added an Arknights-style visual operator browser with live search plus class and sub-class filters.
+- Operator browser uses an internal scroll area so the planner remains close at hand.
+- Imported account state is now a starting baseline rather than a hard planner minimum.
+- Added editable per-goal starting states and manual account maintenance.
+- Added Active/paused goals, priority reordering and Undo after goal deletion.
+- Added exact reserve quantities for materials, LMD and EXP.
+- Added ArkPRTS import verification and LMD raw-vs-parsed auditing.
+- Added import-diff review and optional preservation of manual account overrides.
+- Added quick target/mastery presets and previous-target reuse.
+- Reworked Farming into button-style **Reserve → Crafting → Stages → Summary** navigation.
+- Farming tables now use icons and material/resource names instead of raw item IDs.
+- Battle Record labels explicitly identify T1/T2/T3/T4 tiers.
+- Passive RIIC production is explicitly modelled as up to **T3 Tactical Battle Records**.
+- Added Chip Catalyst acquisition routing through Purchase Certificates and AP farming.
+- Summary provides a concise final stage/run/sanity checklist.
+- Penguin Statistics configuration can be copied directly or downloaded.
+- Hosted profiles are browser-local by default; raw ArkPRTS uploads are not intentionally persisted.
+- Removed portable-distribution workflow from the recommended release path.
 
-## Previous v0.7.2 fix retained
+## Deployment
 
-- Dualchip factory crafting correctly recognizes **2 matching Chip Packs + 1 Chip Catalyst -> 1 Dualchip**.
-- Existing reserve and shared-catalyst behavior remains unchanged.
+Streamlit entry point:
+
+`app/main.py`
+
+Dependencies:
+
+`requirements.txt`
+
+
+## RC2 polish
+
+- Removed the user-facing Diagnostics page.
+- Simplified Home to a concise functional overview.
+- Removed filesystem profile paths from the UI.
+- Replaced Quick Material Edit with a scrollable inventory table containing icon, item name, tier and directly editable owned quantity.
+- Added material search and tier filtering.
+
+
+## Final account inventory polish
+
+- Replaced the generic material data table with an Arknights-style six-column inventory grid.
+- Removed material tier classification and tier filtering.
+- Retained fast name search.
+- Inventory follows the supplied in-game depot order from left to right, then top to bottom.
+- LMD, Purchase Certificates and all four Battle Record tiers appear at the top of the same inventory view.
+- Quantities are edited directly on each item card.

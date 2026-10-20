@@ -8,7 +8,7 @@ from typing import Any, Dict
 from platformdirs import user_data_dir
 
 DATA_DIR = Path(user_data_dir("RhodesPlanner", "RhodesPlanner"))
-PROFILE_PATH = DATA_DIR / "profile.json"
+PROFILE_PATH = DATA_DIR / os.environ.get("RHODES_PROFILE_FILENAME", "profile.json")
 
 
 def profile_path() -> Path:

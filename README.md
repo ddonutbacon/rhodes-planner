@@ -1,10 +1,10 @@
 # Rhodes Planner
 
-**A local-first, account-aware Arknights progression, crafting and farming planner.**
+**An account-aware Arknights progression, crafting and farming planner.**
 
 > Import your account → choose who you want to build → preserve what you want to keep → craft what you can → farm what is actually missing.
 
-Rhodes Planner started from my own love-hate relationship with Arknights 
+Rhodes Planner grew out of my own love-hate relationship with Arknights and a desire to stop rebuilding the same planning logic by hand.
 
 ---
 
@@ -16,80 +16,69 @@ Rhodes Planner started from my own love-hate relationship with Arknights
 
 No installation required.
 
-### 💻 Portable Windows
-
-Prefer to keep everything local?
-
-Download the latest portable Windows release, extract it anywhere, and run:
-
-```text
-Rhodes Planner.bat
-```
-
-No separate Python, pip, Conda or Streamlit installation is required.
+Your normalised Rhodes profile is stored in your browser. Raw ArkPRTS uploads are parsed in memory and are not intentionally persisted by Rhodes Planner.
 
 ---
 
 ## What it does
 
 - Import an **ArkPRTS full-account JSON export**
+- Verify imported LMD against the raw JSON value
 - Read owned operators, levels, skills, masteries, modules and materials
+- Manually update your account state without repeatedly importing JSON
 - Plan multiple operator upgrades together
-- Calculate combined material requirements
-- Respect materials you want to keep in reserve
+- Pause/reactivate goals and reorder priorities without deleting them
+- Set exact reserve quantities for materials, LMD and EXP
 - Use existing materials before recommending farming
-- Account for workshop crafting and crafting costs
+- Account for workshop/factory crafting and crafting costs
+- Resolve Chip Catalyst through **Purchase Certificates / AP farming**
 - Recommend farming stages using **Penguin Statistics**
-- Estimate LMD and EXP farming
-- Account for passive base production
-- Export farming targets for Penguin Statistics Planner
-- Plan **future operators and materials** before they reach global
+- Estimate LMD and Battle Record farming
+- Account for passive RIIC production
+- Copy or download farming targets for Penguin Statistics Planner
+- Plan **future operators and materials** before they reach the Global server
 
 ---
 
 ## How it works
 
 ```text
-Your account
-     ↓
+Account / manual starting state
+        ↓
 Operator goals
-     ↓
-Total requirements
-     ↓
+        ↓
+Active goals only
+        ↓
 Current inventory
-     ↓
-Reserved materials
-     ↓
+        ↓
+Exact reserves
+        ↓
 Available crafting
-     ↓
-Actual deficit
-     ↓
+        ↓
+Shop / acquisition conversions
+        ↓
+Passive RIIC production
+        ↓
 What you still need to farm
 ```
 
-Rhodes does not assume every required material needs to be farmed.
+Rhodes does not assume every required item needs to be farmed directly.
 
-It first asks:
+It asks:
 
-**Do you already own it? Can you craft it? Are you deliberately saving it?**
+**Do you already own it? Can you craft it? Are you deliberately saving it? Does it come from another acquisition route?**
 
-Only then does it calculate what is genuinely missing.
+Only then does it build the final farming checklist.
 
 ---
 
 ## Privacy
 
-Rhodes Planner does **not** request:
+Rhodes Planner does **not** request your Arknights password, email verification codes, authentication tokens or game login session.
 
-- your Arknights password
-- email verification codes
-- authentication tokens
+On the hosted Streamlit app, the normalised Rhodes profile is stored in browser-local storage rather than a shared server-side profile file. A Rhodes profile can also be exported/imported manually for transfer between browsers or devices.
 
-ArkPRTS exports are supplied by the user and parsed by Rhodes for planning purposes.
-
-The portable edition is designed as a local-first tool.
-
-See [`SECURITY.md`](SECURITY.md) for the current threat model and implementation details.
+See [`SECURITY.md`](SECURITY.md) for details.
 
 ---
 
@@ -106,15 +95,13 @@ Rhodes Planner relies on public and community-maintained resources including:
 
 Rhodes Planner is an **unofficial, non-commercial fan project** and is not affiliated with Hypergryph or Yostar.
 
-See [`CREDITS.md`](CREDITS.md) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for detailed attribution.
+See [`CREDITS.md`](CREDITS.md) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ---
 
 ## Development
 
 Rhodes Planner is built with **Python and Streamlit**.
-
-For development:
 
 ```powershell
 python -m venv .venv
@@ -123,7 +110,7 @@ python -m pip install -r requirements-dev.txt
 python -m streamlit run app\main.py
 ```
 
-Run the tests with:
+Run tests with:
 
 ```powershell
 python -m pytest
@@ -135,11 +122,7 @@ python -m pytest
 
 Rhodes Planner was developed through an **AI-assisted iterative development workflow**.
 
-OpenAI's ChatGPT has been the primary implementation, debugging and testing partner.
-
-AI has assisted with coding, refactoring, testing, debugging and documentation.
-
-Product direction, feature requirements, UX decisions, validation, privacy/security decisions and release decisions are directed and reviewed by me as the project author.
+OpenAI's ChatGPT has been the primary implementation, debugging and testing partner. Product direction, feature requirements, UX decisions, validation, privacy/security decisions and release decisions are directed and reviewed by me as the project author.
 
 AI is part of how Rhodes Planner was built.
 
@@ -159,4 +142,4 @@ Rhodes Planner should therefore be treated as a **non-commercial fan and portfol
 
 Thanks to Hypergryph, Yostar, Penguin Statistics, ArknightsAssets, ArkPRTS, ArkPlanner, arkprtserver, community data maintainers, and everyone building tools around a game complicated enough to justify all of this.
 
-And, apparently, thanks to Arknights itself for existing and staying strong after years of release. 
+And, apparently, thanks to Arknights itself for still going strong after all these years.

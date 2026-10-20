@@ -1,7 +1,7 @@
 [project]
 name = "rhodes-planner"
-version = "0.7.3"
-description = "Account-aware Arknights progression, crafting, farming and pull planner."
+version = "0.8.0"
+description = "Account-aware Arknights progression, crafting and farming planner."
 requires-python = ">=3.11"
 license = {text = "MIT"}
 
