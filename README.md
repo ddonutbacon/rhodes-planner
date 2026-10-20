@@ -31,7 +31,6 @@ Your normalised Rhodes profile is stored in your browser. Raw ArkPRTS uploads ar
 - Set exact reserve quantities for materials, LMD and EXP
 - Use existing materials before recommending farming
 - Account for workshop/factory crafting and crafting costs
-- Resolve Chip Catalyst through **Purchase Certificates / AP farming**
 - Recommend farming stages using **Penguin Statistics**
 - Estimate LMD and Battle Record farming
 - Account for passive RIIC production
@@ -61,16 +60,6 @@ Passive RIIC production
         ↓
 What you still need to farm
 ```
-
-Rhodes does not assume every required item needs to be farmed directly.
-
-It asks:
-
-**Do you already own it? Can you craft it? Are you deliberately saving it? Does it come from another acquisition route?**
-
-Only then does it build the final farming checklist.
-
----
 
 ## Privacy
 
